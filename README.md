@@ -145,12 +145,6 @@ npm run dev
 
 ---
 
-## 🤝 Contributors
-
-* Abhishek
-
----
-
 ## ⭐ Final Note
 
 Built to eliminate the biggest bottleneck in ML — **data collection**.
