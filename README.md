@@ -15,11 +15,14 @@ A web app for generating synthetic datasets for ML fine-tuning. You describe a t
 | Label distribution stats | Implemented | Classification and intent only. |
 | Bias Analysis page: class distribution and imbalance charts | Implemented | Computed from the label counts of the last dataset. Only meaningful for classification and intent. |
 | Bias Analysis page: dataset diversity | Implemented | Lexical diversity (unique words / all words), share of unique inputs, and input length, computed in the browser from the generated inputs. |
-| Validation Report page | Implemented | Average quality score, share of unique inputs, valid samples, and samples with no issues, all computed from the last dataset, plus a list of flagged samples. |
+| Validation Report page | Implemented | Average quality score, share of unique inputs, valid samples, samples with no issues, and samples without PII flags, all computed from the last dataset, plus a list of flagged samples. |
 | Dashboard page | Partial | Summary of the single most recent run (counts, valid vs flagged, source, activity list). There is no history. |
 | Pipeline Monitor page | Implemented | Shows the stages of the last run (prompt, generate, validate, distribution check) with real counts. These are sequential steps in one request, not independent agents. |
 | Export to JSON and CSV | Implemented | Done in the browser from the last dataset. There is no backend export endpoint. |
-| Privacy protections (PII detection, anonymisation, differential privacy) | Not implemented | Data is LLM-generated, so no real user records are needed as input, but nothing checks generated text for personal data or memorisation. |
+| Duplicate detection | Implemented | Exact and near-duplicate inputs (word-set similarity of 0.9 or more) are flagged in `backend/validator.py` and lower the sample's score. |
+| PII detection and optional redaction | Implemented (regex-based) | `backend/privacy.py` finds emails, phone numbers, Aadhaar-style numbers, PAN numbers and Luhn-valid card numbers in generated text. Flagged samples lose score; with `redact_pii: true` the values are replaced with placeholders such as `[REDACTED_EMAIL]`. Names and addresses are not detected. |
+| Diversity statistics in the API | Implemented | `stats.diversity` returns lexical diversity, unique-input ratio and input length statistics. |
+| Formal privacy guarantees (anonymisation proofs, differential privacy) | Not implemented | The data is LLM-generated, so no real user records are needed as input, but there is no guarantee that generated text is free of personal data or memorised training data. |
 | Fairness or demographic bias auditing | Not implemented | "Bias analysis" here means label balance and basic text diversity only. |
 | Persistence, dataset history, user accounts | Not implemented | The last dataset and API key live in browser `localStorage`. |
 
@@ -79,7 +82,7 @@ Interactive API docs are served by FastAPI at `http://localhost:8000/docs`.
 | GET | `/` | Health message. |
 | POST | `/generate` | Generate samples, validate them, and return samples plus stats. |
 
-`POST /generate` body: `task_type` (`classification`, `summarization`, `qa`, `ner`, `intent`), `domain` (string), `num_samples` (1-50, default 10), optional `labels`, `language`, `include_edge_cases` (default true), `custom_instructions`, `llm_provider` (`gemini`, `anthropic`, `openai`), `api_key`.
+`POST /generate` body: `task_type` (`classification`, `summarization`, `qa`, `ner`, `intent`), `domain` (string), `num_samples` (1-50, default 10), optional `labels`, `language`, `include_edge_cases` (default true), `custom_instructions`, `llm_provider` (`gemini`, `anthropic`, `openai`), `api_key`, `redact_pii` (default false). The web UI does not expose `redact_pii`; use the API.
 
 The response contains `samples`, `stats`, counts, and two fields describing where the data came from: `source` (`"llm"` or `"mock"`) and `provider`.
 
@@ -96,14 +99,15 @@ pip install -r backend/requirements-dev.txt
 python -m pytest backend
 ```
 
-There are 11 backend tests covering the validator rules, label statistics, the demo fallback, request validation and the error responses. Calls to real LLM providers are not tested.
+There are 22 backend tests covering the validator rules, duplicate detection, PII detection and redaction, diversity statistics, the demo fallback, request validation and the error responses. Calls to real LLM providers are not tested.
 
 Frontend: `cd frontend && npm test` runs one placeholder test (`expect(true).toBe(true)`) that does not exercise application code. `npm run build` completes successfully.
 
 ## Limitations
 
 - Demo fallback: when no `api_key` is sent, `/generate` returns a small fixed set of canned samples, repeated to reach `num_samples`. They ignore `domain`, `labels`, `language` and `custom_instructions`. The response is labelled `"source": "mock"`, but the samples still go through validation, so their scores look real.
-- Validation is heuristic (length, label membership, list shape); it does not measure correctness, realism or semantic quality. A quality score of 100% means only that these checks passed.
+- Validation is heuristic (length, label membership, list shape, duplicates, PII patterns); it does not measure correctness, realism or semantic quality. A quality score of 100% means only that these checks passed.
+- PII detection is pattern-based: it can miss personal data that does not match a pattern (names, addresses) and may flag lookalike numbers. Duplicate detection only compares inputs within one generated batch.
 - Bias analysis is limited to label counts and simple text diversity statistics. No fairness or demographic analysis is performed, and "Flagged Samples" on the Dashboard is simply the share of samples that failed validation.
 - The LLM provider integrations (Anthropic, OpenAI, and the real Gemini path) have not been tested against live APIs in this repository.
 - NER character offsets requested from the LLM are not verified.
@@ -112,4 +116,4 @@ Frontend: `cd frontend && npm test` runs one placeholder test (`expect(true).toB
 
 ## Future work
 
-Multi-language support, dataset versioning, backend export and persistence, duplicate detection and semantic quality metrics, PII checks, and tests that cover the frontend.
+Multi-language support, dataset versioning, backend export and persistence, semantic quality metrics, name and address detection for PII, and tests that cover the frontend.

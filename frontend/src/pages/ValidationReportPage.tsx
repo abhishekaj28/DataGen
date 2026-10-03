@@ -10,6 +10,7 @@ const ValidationReportPage = () => {
     { label: "Unique Inputs", value: 0, color: "bg-primary" },
     { label: "Valid Samples", value: 0, color: "bg-accent" },
     { label: "Samples With No Issues", value: 0, color: "bg-success" },
+    { label: "Samples Without PII Flags", value: 0, color: "bg-primary" },
   ]);
   const [source, setSource] = useState<string | undefined>(undefined);
   const [errorSamples, setErrorSamples] = useState<any[]>([]);
@@ -29,11 +30,16 @@ const ValidationReportPage = () => {
       ? Math.round((data.samples.filter((x: any) => !x.validation || x.validation.issues.length === 0).length / data.samples.length) * 100)
       : 0;
 
+    const piiPct = data.samples.length
+      ? Math.round(((data.samples.length - (data.stats.pii_flagged_count ?? 0)) / data.samples.length) * 100)
+      : 0;
+
     setMetrics([
       { label: "Average Quality Score", value: validationScore, color: "bg-success" },
       { label: "Unique Inputs", value: uniquePct, color: "bg-primary" },
       { label: "Valid Samples", value: validPct, color: "bg-accent" },
       { label: "Samples With No Issues", value: noIssuesPct, color: "bg-success" },
+      { label: "Samples Without PII Flags", value: piiPct, color: "bg-primary" },
     ]);
     setSource(data.source);
 

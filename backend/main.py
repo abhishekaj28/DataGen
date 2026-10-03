@@ -41,7 +41,7 @@ async def generate(req: GenerationRequest):
         logger.exception("Unexpected error during generation")
         raise HTTPException(status_code=500, detail="Internal error during generation")
 
-    samples = validate_batch(samples, req.task_type, req.labels)
+    samples = validate_batch(samples, req.task_type, req.labels, redact_pii=req.redact_pii)
     stats = compute_stats(samples, req.task_type)
     valid_samples = [s for s in samples if s.validation and s.validation.is_valid]
 

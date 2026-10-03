@@ -19,11 +19,13 @@ class GenerationRequest(BaseModel):
     custom_instructions: Optional[str] = None
     llm_provider: Optional[str] = "anthropic"
     api_key: Optional[str] = None
+    redact_pii: bool = False  # replace detected emails, phone numbers, IDs and card numbers in the output
 
 class ValidationResult(BaseModel):
     is_valid: bool
     issues: List[str] = []
     score: float
+    pii_types: List[str] = []
 
 class DataSample(BaseModel):
     id: int

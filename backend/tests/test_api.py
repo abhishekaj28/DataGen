@@ -42,3 +42,17 @@ def test_unknown_provider_is_rejected_not_mocked():
 def test_num_samples_is_bounded():
     r = client.post("/generate", json={**BODY, "num_samples": 500})
     assert r.status_code == 422
+
+
+def test_redact_pii_flag_is_applied(monkeypatch):
+    from backend.models import DataSample
+
+    async def fake(req):
+        return [DataSample(id=1, input="Reach me at jane@example.com about the order", output="neutral")], "llm", "gemini"
+
+    monkeypatch.setattr(main, "generate_samples", fake)
+    body = {**BODY, "num_samples": 1, "api_key": "k", "llm_provider": "gemini", "redact_pii": True}
+    data = client.post("/generate", json=body).json()
+    assert "jane@example.com" not in data["samples"][0]["input"]
+    assert data["stats"]["pii_redacted_count"] == 1
+    assert "diversity" in data["stats"]
