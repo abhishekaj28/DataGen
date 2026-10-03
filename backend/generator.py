@@ -1,12 +1,20 @@
 import json
+import logging
 import os
 import re
-from typing import List
+from typing import List, Tuple
 from .models import TaskType, DataSample, GenerationRequest
 from .prompts import get_prompt, SYSTEM_PROMPT
 
 from google import genai
 from google.genai import types
+
+logger = logging.getLogger(__name__)
+
+
+class LLMProviderError(Exception):
+    """Raised when the LLM provider call fails (bad key, quota, network, ...)."""
+
 
 # Load .env if present
 try:
@@ -60,7 +68,19 @@ async def generate_with_gemini(prompt: str, api_key: str) -> str:
     return response.text
 
 
-async def generate_samples(req: GenerationRequest) -> List[DataSample]:
+async def _call_provider(provider: str, prompt: str, api_key: str) -> str:
+    try:
+        if provider == "openai":
+            return await generate_with_openai(prompt, api_key)
+        if provider == "anthropic":
+            return await generate_with_anthropic(prompt, api_key)
+        return await generate_with_gemini(prompt, api_key)
+    except Exception as e:
+        raise LLMProviderError(f"{provider} request failed: {e}") from e
+
+
+async def generate_samples(req: GenerationRequest) -> Tuple[List[DataSample], str, str]:
+    """Returns (samples, source, provider). source is "llm" or "mock"."""
     prompt = get_prompt(
         task_type=req.task_type,
         domain=req.domain,
@@ -75,16 +95,15 @@ async def generate_samples(req: GenerationRequest) -> List[DataSample]:
     provided_key = req.api_key or ""
     provider = req.llm_provider or "gemini"
 
-    if provider == "openai" and provided_key:
-        raw = await generate_with_openai(prompt, provided_key)
-    elif provider == "anthropic" and provided_key:
-        raw = await generate_with_anthropic(prompt, provided_key)
-    elif provider == "gemini" and provided_key:
-        raw = await generate_with_gemini(prompt, provided_key)
+    if provider not in ("openai", "anthropic", "gemini"):
+        raise ValueError(f"Unknown llm_provider '{provider}'. Use gemini, anthropic or openai.")
+
+    if provided_key:
+        raw = await _call_provider(provider, prompt, provided_key)
     else:
-        # No key available — return mock data
-        print("⚠️  No API key found — returning mock data.")
-        return _mock_samples(req)
+        # No key supplied: return canned demo data and say so in the response
+        logger.warning("No API key supplied; returning mock data.")
+        return _mock_samples(req), "mock", "mock"
 
     cleaned = clean_json_response(raw)
 
@@ -109,7 +128,7 @@ async def generate_samples(req: GenerationRequest) -> List[DataSample]:
             metadata=item.get("metadata", {}),
         ))
 
-    return samples
+    return samples, "llm", provider
 
 
 def _mock_samples(req: GenerationRequest) -> List[DataSample]:

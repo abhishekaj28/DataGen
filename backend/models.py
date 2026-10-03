@@ -39,4 +39,6 @@ class GenerationResponse(BaseModel):
     total_generated: int
     total_valid: int
     samples: List[DataSample]
+    source: str = "llm"  # "llm" for real model output, "mock" for canned demo data
+    provider: Optional[str] = None
     stats: Dict[str, Any] = {}

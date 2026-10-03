@@ -1,15 +1,17 @@
 import { motion } from "framer-motion";
 import { ShieldCheck, AlertTriangle, CheckCircle, XCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { useState, useEffect } from "react";
+import MockNotice from "@/components/MockNotice";
 
 const ValidationReportPage = () => {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [metrics, setMetrics] = useState([
-    { label: "Schema Validation", value: 0, color: "bg-success" },
-    { label: "Duplicate Detection", value: 0, color: "bg-primary" },
-    { label: "Semantic Consistency", value: 0, color: "bg-accent" },
-    { label: "Format Compliance", value: 0, color: "bg-success" },
+    { label: "Average Quality Score", value: 0, color: "bg-success" },
+    { label: "Unique Inputs", value: 0, color: "bg-primary" },
+    { label: "Valid Samples", value: 0, color: "bg-accent" },
+    { label: "Samples With No Issues", value: 0, color: "bg-success" },
   ]);
+  const [source, setSource] = useState<string | undefined>(undefined);
   const [errorSamples, setErrorSamples] = useState<any[]>([]);
   const [datasetInfo, setDatasetInfo] = useState({ task_type: "-", domain: "-", total: 0, valid: 0 });
 
@@ -21,12 +23,19 @@ const ValidationReportPage = () => {
     const validationScore = Math.round((data.stats.avg_validation_score ?? 0) * 100);
     const validPct = Math.round((data.total_valid / data.total_generated) * 100);
 
+    const inputs: string[] = data.samples.map((x: any) => String(x.input ?? "").trim().toLowerCase());
+    const uniquePct = inputs.length ? Math.round((new Set(inputs).size / inputs.length) * 100) : 0;
+    const noIssuesPct = data.samples.length
+      ? Math.round((data.samples.filter((x: any) => !x.validation || x.validation.issues.length === 0).length / data.samples.length) * 100)
+      : 0;
+
     setMetrics([
-      { label: "Schema Validation", value: validationScore, color: "bg-success" },
-      { label: "Duplicate Detection", value: 99, color: "bg-primary" },
-      { label: "Semantic Consistency", value: validPct, color: "bg-accent" },
-      { label: "Format Compliance", value: 100, color: "bg-success" },
+      { label: "Average Quality Score", value: validationScore, color: "bg-success" },
+      { label: "Unique Inputs", value: uniquePct, color: "bg-primary" },
+      { label: "Valid Samples", value: validPct, color: "bg-accent" },
+      { label: "Samples With No Issues", value: noIssuesPct, color: "bg-success" },
     ]);
+    setSource(data.source);
 
     setDatasetInfo({
       task_type: data.task_type,
@@ -57,6 +66,8 @@ const ValidationReportPage = () => {
             : "Generate a dataset first to see validation results"}
         </p>
       </div>
+
+      <MockNotice source={source} />
 
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
         {metrics.map((m, i) => (

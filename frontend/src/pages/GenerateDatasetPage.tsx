@@ -49,9 +49,9 @@ const GenerateDatasetPage = () => {
     setLogs(["🚀 Connecting to DataGen backend..."]);
 
     try {
-      setLogs(prev => [...prev, "📋 Planner Agent: Analyzing task requirements..."]);
+      setLogs(prev => [...prev, "📋 Building the prompt and calling the backend..."]);
 
-      const response = await fetch("http://localhost:8000/generate", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL ?? "http://localhost:8000"}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -77,13 +77,10 @@ const GenerateDatasetPage = () => {
         : "N/A";
 
       setLogs(prev => [...prev,
-        "🧠 Generator Agent: Creating synthetic samples with Claude...",
-      `📊 Generated ${data.total_generated} ${taskType.toLowerCase()} samples...`,
-        "🔍 Critic Agent: Validating schema consistency...",
-      `✅ Validation passed — ${qualityPct}% quality score`,
-      `⚖️ Bias Detector: ${data.total_valid} valid / ${data.stats?.invalid_count ?? 0} flagged`,
-      `📦 Dataset ready in ${format} format`,
-        "🎉 Dataset generation complete!",
+      `📊 Generated ${data.total_generated} ${taskType.toLowerCase()} samples (${data.source === "mock" ? "demo data" : `LLM: ${data.provider}`})`,
+      `🔍 Rule-based validation: ${qualityPct}% average quality score`,
+      `✅ ${data.total_valid} valid, ${data.stats?.invalid_count ?? 0} flagged`,
+      `📦 Dataset ready to export as ${format}`,
       ]);
 
       // Store result for other pages
@@ -107,7 +104,7 @@ const GenerateDatasetPage = () => {
       {noKeyWarning && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-sm">
           <Key className="w-4 h-4 shrink-0" />
-          No Anthropic API key found. Go to <strong className="mx-1">Settings → API Configuration</strong> and save your key to enable real AI generation.
+          No Gemini API key found. Go to <strong className="mx-1">Settings → API Configuration</strong> and save your key to enable real AI generation.
         </div>
       )}
 

@@ -8,7 +8,7 @@ import logo from "@/assets/logo.png";
 const navItems = [
   { title: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
   { title: "Generate Dataset", path: "/dashboard/generate", icon: Sparkles },
-  { title: "Agent Monitor", path: "/dashboard/agents", icon: Bot },
+  { title: "Pipeline Monitor", path: "/dashboard/agents", icon: Bot },
   { title: "Validation Report", path: "/dashboard/validation", icon: ClipboardCheck },
   { title: "Bias Analysis", path: "/dashboard/bias", icon: Scale },
   { title: "Export", path: "/dashboard/export", icon: Download },

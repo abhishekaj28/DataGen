@@ -1,22 +1,15 @@
 import { motion } from "framer-motion";
-import { Scale } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { useState, useEffect } from "react";
+import MockNotice from "@/components/MockNotice";
 
 const COLORS = ["#10B981", "#EF4444", "#6366F1", "#F59E0B", "#22D3EE"];
-
-const diversityMetrics = [
-  { label: "Lexical Diversity", value: 87.3, color: "bg-primary" },
-  { label: "Syntactic Variety", value: 92.1, color: "bg-accent" },
-  { label: "Semantic Coverage", value: 78.6, color: "bg-success" },
-  { label: "Length Distribution", value: 94.5, color: "bg-primary" },
-];
 
 const BiasAnalysisPage = () => {
   const [classData, setClassData] = useState<any[]>([]);
   const [imbalanceData, setImbalanceData] = useState<any[]>([]);
-  const [heatmapLabels, setHeatmapLabels] = useState<string[]>([]);
-  const [heatmapData, setHeatmapData] = useState<number[][]>([]);
+  const [diversity, setDiversity] = useState<{ label: string; display: string; pct?: number; color: string }[]>([]);
+  const [source, setSource] = useState<string | undefined>(undefined);
   const [hasData, setHasData] = useState(false);
 
   useEffect(() => {
@@ -41,15 +34,23 @@ const BiasAnalysisPage = () => {
         expected,
       }));
 
-      const labels = Object.keys(dist);
-      const heatmap = labels.map((_, i) =>
-        labels.map((__, j) => (i === j ? 0.9 : Math.random() * 0.3))
-      );
+      // Diversity metrics computed from the generated inputs themselves
+      const inputs: string[] = (data.samples ?? []).map((x: any) => String(x.input ?? "").trim().toLowerCase());
+      const words = inputs.flatMap((t) => t.split(/\s+/).filter(Boolean));
+      const lengths = inputs.map((t) => t.split(/\s+/).filter(Boolean).length);
+      const lexical = words.length ? Math.round((new Set(words).size / words.length) * 1000) / 10 : 0;
+      const uniqueInputs = inputs.length ? Math.round((new Set(inputs).size / inputs.length) * 1000) / 10 : 0;
+      const avgLen = lengths.length ? Math.round((lengths.reduce((a, b) => a + b, 0) / lengths.length) * 10) / 10 : 0;
+      setDiversity([
+        { label: "Lexical Diversity (unique words / all words)", display: `${lexical}%`, pct: lexical, color: "bg-primary" },
+        { label: "Unique Inputs", display: `${uniqueInputs}%`, pct: uniqueInputs, color: "bg-success" },
+        { label: "Average Input Length", display: `${avgLen} words`, color: "bg-accent" },
+        { label: "Input Length Range", display: lengths.length ? `${Math.min(...lengths)}-${Math.max(...lengths)} words` : "-", color: "bg-accent" },
+      ]);
+      setSource(data.source);
 
       setClassData(pie);
       setImbalanceData(imbalance);
-      setHeatmapLabels(labels);
-      setHeatmapData(heatmap);
       setHasData(true);
     }
   }, []);
@@ -72,8 +73,10 @@ const BiasAnalysisPage = () => {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Bias Analysis</h1>
-        <p className="text-muted-foreground mt-1">Fairness metrics and class distribution analysis</p>
+        <p className="text-muted-foreground mt-1">Class distribution and dataset diversity. This is not a demographic or fairness audit.</p>
       </div>
+
+      <MockNotice source={source} />
 
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="glass rounded-2xl p-6">
@@ -106,49 +109,23 @@ const BiasAnalysisPage = () => {
       </div>
 
       <div className="glass rounded-2xl p-6">
-        <h3 className="text-lg font-semibold text-foreground mb-6">Linguistic Diversity Scores</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-1">Dataset Diversity</h3>
+        <p className="text-xs text-muted-foreground mb-6">Computed from the generated inputs of the last run.</p>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {diversityMetrics.map((m, i) => (
+          {diversity.map((m, i) => (
             <motion.div key={m.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
               <p className="text-sm text-muted-foreground mb-2">{m.label}</p>
-              <p className="text-2xl font-bold text-foreground mb-2">{m.value}%</p>
-              <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                <motion.div className={`h-full rounded-full ${m.color}`} initial={{ width: 0 }}
-                  animate={{ width: `${m.value}%` }} transition={{ duration: 1, delay: i * 0.1 }} />
-              </div>
+              <p className="text-2xl font-bold text-foreground mb-2">{m.display}</p>
+              {m.pct !== undefined && (
+                <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                  <motion.div className={`h-full rounded-full ${m.color}`} initial={{ width: 0 }}
+                    animate={{ width: `${m.pct}%` }} transition={{ duration: 1, delay: i * 0.1 }} />
+                </div>
+              )}
             </motion.div>
           ))}
         </div>
       </div>
-
-      {heatmapLabels.length > 0 && (
-        <div className="glass rounded-2xl p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <Scale className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-semibold text-foreground">Confusion Heatmap</h3>
-          </div>
-          <div className="flex justify-center">
-            <div>
-              <div className="flex gap-1 mb-1 ml-20">
-                {heatmapLabels.map((l) => (
-                  <div key={l} className="w-20 text-center text-xs text-muted-foreground">{l}</div>
-                ))}
-              </div>
-              {heatmapData.map((row, i) => (
-                <div key={i} className="flex items-center gap-1 mb-1">
-                  <div className="w-20 text-xs text-muted-foreground text-right pr-2">{heatmapLabels[i]}</div>
-                  {row.map((val, j) => (
-                    <div key={j} className="w-20 h-12 rounded-lg flex items-center justify-center text-sm font-semibold"
-                      style={{ backgroundColor: `rgba(99, 102, 241, ${val})`, color: val > 0.5 ? "white" : "hsl(215 20% 55%)" }}>
-                      {val.toFixed(2)}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
 import { Database, BarChart3, ShieldCheck, TrendingUp, Activity } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { useState, useEffect } from "react";
+import MockNotice from "@/components/MockNotice";
 
 const statusColors: Record<string, string> = {
   success: "bg-success", warning: "bg-accent", error: "bg-destructive", info: "bg-primary",
@@ -9,22 +10,18 @@ const statusColors: Record<string, string> = {
 
 const DashboardPage = () => {
   const [stats, setStats] = useState([
-    { label: "Total Datasets", value: "0", icon: Database, change: "+0%" },
-    { label: "Samples Created", value: "0", icon: BarChart3, change: "+0%" },
-    { label: "Validation Score", value: "0%", icon: ShieldCheck, change: "+0%" },
-    { label: "Bias Score", value: "0%", icon: TrendingUp, change: "+0%" },
+    { label: "Datasets (last run)", value: "0", icon: Database },
+    { label: "Samples Created", value: "0", icon: BarChart3 },
+    { label: "Validation Score", value: "0%", icon: ShieldCheck },
+    { label: "Flagged Samples", value: "0%", icon: TrendingUp },
   ]);
+  const [runInfo, setRunInfo] = useState<{ label: string; value: string }[]>([]);
+  const [source, setSource] = useState<string | undefined>(undefined);
   const [pieData, setPieData] = useState([
     { name: "Valid", value: 100, color: "#10B981" },
     { name: "Invalid", value: 0, color: "#EF4444" },
   ]);
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
-  const [lineData] = useState([
-    { name: "Mon", samples: 1200 }, { name: "Tue", samples: 3400 },
-    { name: "Wed", samples: 2800 }, { name: "Thu", samples: 5200 },
-    { name: "Fri", samples: 4100 }, { name: "Sat", samples: 6800 },
-    { name: "Sun", samples: 7200 },
-  ]);
 
   useEffect(() => {
     const raw = localStorage.getItem("lastDataset");
@@ -36,10 +33,17 @@ const DashboardPage = () => {
     const biasScore = Math.round((invalidCount / data.total_generated) * 100);
 
     setStats([
-      { label: "Total Datasets", value: "1", icon: Database, change: "+100%" },
-      { label: "Samples Created", value: String(data.total_generated), icon: BarChart3, change: "+100%" },
-      { label: "Validation Score", value: `${validScore}%`, icon: ShieldCheck, change: "+2.1%" },
-      { label: "Bias Score", value: `${biasScore}%`, icon: TrendingUp, change: biasScore > 5 ? "+bad" : "-good" },
+      { label: "Datasets (last run)", value: "1", icon: Database },
+      { label: "Samples Created", value: String(data.total_generated), icon: BarChart3 },
+      { label: "Validation Score", value: `${validScore}%`, icon: ShieldCheck },
+      { label: "Flagged Samples", value: `${biasScore}%`, icon: TrendingUp },
+    ]);
+    setSource(data.source);
+    setRunInfo([
+      { label: "Task type", value: String(data.task_type) },
+      { label: "Domain", value: String(data.domain) },
+      { label: "Data source", value: data.source === "mock" ? "Demo data (no API key)" : `LLM (${data.provider ?? "unknown"})` },
+      { label: "Requested / generated / valid", value: `${data.total_requested} / ${data.total_generated} / ${data.total_valid}` },
     ]);
 
     setPieData([
@@ -81,8 +85,10 @@ const DashboardPage = () => {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Overview of your dataset generation activity</p>
+        <p className="text-muted-foreground mt-1">Summary of your most recent dataset generation run</p>
       </div>
+
+      <MockNotice source={source} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, i) => (
@@ -92,9 +98,6 @@ const DashboardPage = () => {
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                 <stat.icon className="w-5 h-5 text-primary" />
               </div>
-              <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                stat.change.includes("bad") ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"
-              }`}>{stat.change}</span>
             </div>
             <p className="text-3xl font-bold text-foreground">{stat.value}</p>
             <p className="text-sm text-muted-foreground mt-1">{stat.label}</p>
@@ -104,20 +107,23 @@ const DashboardPage = () => {
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 glass rounded-2xl p-6">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Samples Over Time</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={lineData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(217 33% 20%)" />
-              <XAxis dataKey="name" stroke="hsl(215 20% 55%)" fontSize={12} />
-              <YAxis stroke="hsl(215 20% 55%)" fontSize={12} />
-              <Tooltip contentStyle={{ background: "hsl(217 33% 14%)", border: "1px solid hsl(217 33% 22%)", borderRadius: "12px", color: "hsl(213 31% 91%)" }} />
-              <Line type="monotone" dataKey="samples" stroke="hsl(239 84% 67%)" strokeWidth={2} dot={{ fill: "hsl(239 84% 67%)", r: 4 }} />
-            </LineChart>
-          </ResponsiveContainer>
+          <h3 className="text-lg font-semibold text-foreground mb-4">Last Run</h3>
+          {runInfo.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No dataset generated yet. Go to Generate Dataset first.</p>
+          ) : (
+            <dl className="space-y-3">
+              {runInfo.map((r) => (
+                <div key={r.label} className="flex justify-between text-sm border-b border-border pb-2">
+                  <dt className="text-muted-foreground">{r.label}</dt>
+                  <dd className="font-medium text-foreground">{r.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </div>
 
         <div className="glass rounded-2xl p-6">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Class Distribution</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-4">Valid vs Flagged</h3>
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" strokeWidth={0}>
