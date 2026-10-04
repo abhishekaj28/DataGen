@@ -4,6 +4,18 @@ A web app for generating synthetic datasets for ML fine-tuning. You describe a t
 
 > Status: working prototype. Context: a team project; a research write-up is in progress with teammates.
 
+## Screenshots
+
+These were captured with the built-in demo data (no API key), which is why the notice is visible.
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+![Validation report](docs/screenshots/validation.png)
+
+![Bias analysis](docs/screenshots/bias-analysis.png)
+
+![Pipeline monitor](docs/screenshots/pipeline-monitor.png)
+
 ## Features
 
 | Feature | Status | Notes |
